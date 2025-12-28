@@ -24,13 +24,18 @@ func main() {
 	db := database.ConnectDB(os.Getenv("DB_CONNECTION_STRING"))
 
 	exampleRepository := repository.NewExampleRepository(db)
-
+	notebookRepository := repository.NewNotebookRepository(db)
+	
 	exampleService := service.NewExampleService(exampleRepository)
-
+	notebookService := service.NewNotebookService(notebookRepository)
+	
 	exampleController := controller.NewExampleController(exampleService)
+	notebookController := controller.NewNotebookController(notebookService)
+
 
 	api := app.Group("/api")
 	exampleController.RegisterRoutes(api)
+	notebookController.RegisterRoutes(api)
 
 	log.Fatal(app.Listen(":3000"))
 }
