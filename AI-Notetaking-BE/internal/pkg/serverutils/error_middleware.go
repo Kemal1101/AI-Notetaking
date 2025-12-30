@@ -1,6 +1,7 @@
 package serverutils
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"runtime/debug"
@@ -25,6 +26,12 @@ func ErrorHandlerMiddleware() fiber.Handler {
 			return nil
 		}
 
+		if errors.Is(err, ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(ErrorResponse(
+				fiber.StatusNotFound, "Entity not found",
+			))
+		}
+		
 		if fiberErr, ok := err.(*fiber.Error); ok {
 			return c.Status(fiberErr.Code).JSON(ErrorResponse(
 				fiberErr.Code, fiberErr.Message,

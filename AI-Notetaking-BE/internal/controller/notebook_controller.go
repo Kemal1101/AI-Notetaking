@@ -6,11 +6,13 @@ import (
 	"ai-notetaking-be/internal/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type INotebookController interface {
 	RegisterRoutes(r fiber.Router)
 	Create(ctx *fiber.Ctx) error
+	Show(ctx *fiber.Ctx) error
 }
 
 type notebookController struct {
@@ -24,6 +26,7 @@ func NewNotebookController(service service.INotebookService) INotebookController
 func (c *notebookController) RegisterRoutes(r fiber.Router) {
 	h := r.Group("/notebook/v1")
 	h.Post("", c.Create)
+	h.Get(":id", c.Show)
 }
 
 func (c *notebookController) Create(ctx *fiber.Ctx) error {
@@ -43,4 +46,16 @@ func (c *notebookController) Create(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(serverutils.SuccessResponse("Success create notebook", res))
+}
+
+func (c *notebookController) Show(ctx *fiber.Ctx) error {
+	idParam := ctx.Params("id")
+	id, _ := uuid.Parse(idParam)
+
+	res, err := c.service.Show(ctx.Context(), id)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(serverutils.SuccessResponse("Success show notebook", res))
 }
