@@ -13,6 +13,7 @@ import (
 type INotebookService interface {
 	Create(ctx context.Context, req *dto.CreateNotebookRequest) (*dto.CreateNotebookResponse, error)
 	Show(ctx context.Context, id uuid.UUID) (*dto.ShowNotebookResponse, error)
+	Update(ctx context.Context, req *dto.UpdateNotebookRequest) (*dto.UpdateNotebookResponse, error)
 }
 
 type notebookService struct {
@@ -55,4 +56,25 @@ func (c *notebookService) Show(ctx context.Context, id uuid.UUID) (*dto.ShowNote
 		CreatedAt: notebook.CreatedAt,
 		UpdatedAt: notebook.UpdatedAt,
 	}, nil
+}
+
+func (c *notebookService) Update(ctx context.Context, req *dto.UpdateNotebookRequest) (*dto.UpdateNotebookResponse, error) {
+	notebook, err := c.notebookRepository.GetById(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	
+	now := time.Now()
+	notebook.Name = req.Name
+	notebook.UpdatedAt = &now
+
+	err = c.notebookRepository.Update(ctx, notebook)
+	if err != nil {
+		return nil, err
+	}
+	
+	res := dto.UpdateNotebookResponse{
+		Id: notebook.Id,
+	}
+	return &res, nil
 }

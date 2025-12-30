@@ -13,6 +13,7 @@ type INotebookController interface {
 	RegisterRoutes(r fiber.Router)
 	Create(ctx *fiber.Ctx) error
 	Show(ctx *fiber.Ctx) error
+	Update(ctx *fiber.Ctx) error
 }
 
 type notebookController struct {
@@ -27,6 +28,7 @@ func (c *notebookController) RegisterRoutes(r fiber.Router) {
 	h := r.Group("/notebook/v1")
 	h.Post("", c.Create)
 	h.Get(":id", c.Show)
+	h.Put(":id", c.Update)
 }
 
 func (c *notebookController) Create(ctx *fiber.Ctx) error {
@@ -58,4 +60,26 @@ func (c *notebookController) Show(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(serverutils.SuccessResponse("Success show notebook", res))
+}
+
+func (c *notebookController) Update(ctx *fiber.Ctx) error {
+	idParam := ctx.Params("id")
+	id, _ := uuid.Parse(idParam)
+	
+	var req dto.UpdateNotebookRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		return err
+	}
+	req.Id = id
+
+	err := serverutils.ValidateRequest(req)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.service.Update(ctx.Context(), &req)
+	if err != nil {
+		return err
+	}
+	 return ctx.JSON(serverutils.SuccessResponse("Success update notebook", res))
 }
