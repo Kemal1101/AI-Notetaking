@@ -6,6 +6,7 @@ import (
 	"ai-notetaking-be/pkg/database"
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,8 @@ type INotebookRepository interface {
 	Create(ctx context.Context, notebook *entity.Notebook) error
 	GetById(ctx context.Context, id uuid.UUID) (*entity.Notebook, error)
 	Update(ctx context.Context, notebook *entity.Notebook) error
+	DeleteById(ctx context.Context, id uuid.UUID) error
+	NullifyParentById(ctx context.Context, parentId uuid.UUID) error
 }
 
 type notebookRepository struct {
@@ -32,7 +35,7 @@ func (n *notebookRepository) UsingTx(ctx context.Context, tx database.DatabaseQu
 func (n *notebookRepository) Create(ctx context.Context, notebook *entity.Notebook) error {
 	_, err := n.db.Exec(
 		ctx,
-		`iNSERT INTO notebook (id, name, parent_id, created_at, updated_at, deleted_at, is_deleted) values ($1, $2, $3, $4, $5, $6, $7)`,
+		`INSERT INTO notebook (id, name, parent_id, created_at, updated_at, deleted_at, is_deleted) values ($1, $2, $3, $4, $5, $6, $7)`,
 		notebook.Id,
 		notebook.Name,
 		notebook.ParentId,
@@ -89,6 +92,34 @@ func (n *notebookRepository) Update(ctx context.Context, notebook *entity.Notebo
 		notebook.ParentId,
 		notebook.UpdatedAt,
 		notebook.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *notebookRepository) DeleteById(ctx context.Context, id uuid.UUID) error {
+	_, err := n.db.Exec(
+		ctx,
+		`UPDATE notebook SET is_deleted = true, deleted_at = $1 WHERE id = $2`,
+		time.Now(),
+		id,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (n *notebookRepository) NullifyParentById(ctx context.Context, parentId uuid.UUID) error {
+	_, err := n.db.Exec(
+		ctx,
+		`UPDATE notebook SET parent_id = NULL, updated_at = $2 WHERE parent_id = $1`,
+		parentId,
+		time.Now(),
 	)
 	if err != nil {
 		return err
