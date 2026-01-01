@@ -28,11 +28,21 @@ func NewNotebookController(service service.INotebookService) INotebookController
 
 func (c *notebookController) RegisterRoutes(r fiber.Router) {
 	h := r.Group("/notebook/v1")
+	h.Get("", c.GetAll)
 	h.Post("", c.Create)
 	h.Get(":id", c.Show)
 	h.Put(":id", c.Update)
 	h.Delete(":id", c.Delete)
 	h.Put(":id/move", c.MoveNotebook)
+}
+
+func (c *notebookController) GetAll(ctx *fiber.Ctx) error {
+	res, err := c.service.GetAll(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(serverutils.SuccessResponse("Success get all notebooks", res))
 }
 
 func (c *notebookController) Create(ctx *fiber.Ctx) error {
