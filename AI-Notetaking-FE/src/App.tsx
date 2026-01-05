@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Sidebar } from "./components/sidebar"
 import { NoteEditor } from "./components/note-editor"
 import { SearchDialog } from "./components/search-dialog"
@@ -9,11 +9,15 @@ import { Button } from "./components/ui/button"
 import { Search, MessageSquare, Plus, FolderPlus, XCircle } from "lucide-react" // Import XCircle for clear button
 import type { Note } from "./types/note"
 import type { Notebook } from "./types/notebook"
-import { mockNotebooks, mockNotes } from "./lib/mock-data"
+import { mockNotes } from "./lib/mock-data"
 import "./App.css"
+import axios from "axios"
+import type { GetAllNotebooksResponse } from "./dto/notebook"
+import type { BaseResponse } from "./dto/base-response"
+import { Config } from "./config/config"
 
 export default function App() {
-  const [notebooks, setNotebooks] = useState<Notebook[]>(mockNotebooks)
+  const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [notes, setNotes] = useState<Note[]>(mockNotes)
   const [selectedNotebook, setSelectedNotebook] = useState<string | null>(null)
   const [selectedNote, setSelectedNote] = useState<string | null>(null)
@@ -27,6 +31,22 @@ export default function App() {
   const [isDeletingNote, setIsDeletingNote] = useState<string | null>(null) // State for deleting note
 
   const currentNote = notes.find((note) => note.id === selectedNote)
+
+  useEffect(() => {
+    const fetchAllNotebooks = async () => {
+      const data = await axios.get<BaseResponse<GetAllNotebooksResponse[]>>(`${Config.apiBaseUrl}`)
+
+      setNotebooks(data.data.data.map(notebook => ({
+        id: notebook.id,
+        name: notebook.name,
+        parentId: notebook.parent_id,
+        createdAt: notebook.created_at,
+        updatedAt: notebook.updated_at ?? notebook.created_at,
+      })))
+    }
+    fetchAllNotebooks()
+  }, [])
+  
 
   const handleNoteUpdate = (noteId: string, updates: Partial<Note>) => {
     setNotes((prev) => prev.map((note) => (note.id === noteId ? { ...note, ...updates, updatedAt: new Date() } : note)))
