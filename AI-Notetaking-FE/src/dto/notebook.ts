@@ -22,3 +22,11 @@ export interface UpdateNotebookRequest {
 export interface UpdateNotebookResponse {
     id : string;
 }
+
+export interface MoveNotebookRequest {
+    parent_id : string | null;
+}
+
+export interface MoveNotebookResponse {
+    id : string;
+}

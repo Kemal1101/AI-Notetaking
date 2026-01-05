@@ -12,7 +12,7 @@ import type { Notebook } from "./types/notebook"
 import { mockNotes } from "./lib/mock-data"
 import "./App.css"
 import axios from "axios"
-import { type CreateNotebookResponse, type CreateNotebookRequest, type GetAllNotebooksResponse } from "./dto/notebook"
+import { type CreateNotebookResponse, type CreateNotebookRequest, type GetAllNotebooksResponse, type MoveNotebookRequest } from "./dto/notebook"
 import type { BaseResponse } from "./dto/base-response"
 import { Config } from "./config/config"
 
@@ -61,18 +61,12 @@ export default function App() {
 
     setIsDeletingNotebook(notebookId) // Set loading for this specific notebook
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    await axios.delete(`${Config.apiBaseUrl}/${notebookId}`)
 
-    // Delete all notes in this notebook and its children
-    const notebookIdsToDelete = getAllChildNotebooks(notebookId)
-    setNotes((prev) => prev.filter((note) => !notebookIdsToDelete.includes(note.notebookId)))
-
-    // Delete the notebook and its children
-    setNotebooks((prev) => prev.filter((notebook) => !notebookIdsToDelete.includes(notebook.id)))
+    await fetchAllNotebooks()
 
     // Clear selection if deleted
-    if (selectedNotebook === notebookId || notebookIdsToDelete.includes(selectedNotebook || "")) {
+    if (selectedNotebook === notebookId) {
       setSelectedNotebook(null)
       setSelectedNote(null)
     }
@@ -132,14 +126,15 @@ export default function App() {
     }
 
     setIsProcessingMove(true) // Start global loading for move
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // Dummy delay
-
-    setNotebooks((prev) =>
-      prev.map((notebook) =>
-        notebook.id === notebookId ? { ...notebook, parentId: targetParentId, updatedAt: new Date() } : notebook,
-      ),
+    
+    const request: MoveNotebookRequest = {
+      parent_id: targetParentId
+    }
+    await axios.put<BaseResponse<MoveNotebookRequest>>(
+      `${Config.apiBaseUrl}/${notebookId}/move`,
+      request
     )
-
+    await fetchAllNotebooks()
     // Auto-expand target parent if it exists
     if (targetParentId) {
       setExpandedNotebooks((prev) => new Set([...prev, targetParentId]))
