@@ -52,12 +52,8 @@ export default function App() {
     setNotes((prev) => prev.map((note) => (note.id === noteId ? { ...note, ...updates, updatedAt: new Date() } : note)))
   }
 
-  const handleNotebookUpdate = (notebookId: string, updates: Partial<Notebook>) => {
-    setNotebooks((prev) =>
-      prev.map((notebook) =>
-        notebook.id === notebookId ? { ...notebook, ...updates, updatedAt: new Date() } : notebook,
-      ),
-    )
+  const handleNotebookUpdate = () => {
+    fetchAllNotebooks()
   }
 
   const handleDeleteNotebook = async (notebookId: string) => {

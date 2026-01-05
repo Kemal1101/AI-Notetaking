@@ -14,3 +14,11 @@ export interface CreateNotebookRequest {
 export interface CreateNotebookResponse {
     id : string;
 }
+
+export interface UpdateNotebookRequest {
+    name: string;
+}
+
+export interface UpdateNotebookResponse {
+    id : string;
+}

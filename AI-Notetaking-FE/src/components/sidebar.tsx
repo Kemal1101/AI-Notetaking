@@ -10,6 +10,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from "../lib/utils"
 import type { Note } from "../types/note"
 import type { Notebook } from "../types/notebook"
+import axios from "axios"
+import { Config } from "../config/config"
+import type { BaseResponse } from "../dto/base-response"
+import type { UpdateNotebookRequest, UpdateNotebookResponse } from "../dto/notebook"
 
 interface SidebarProps {
     notebooks: Notebook[]
@@ -80,7 +84,13 @@ export function Sidebar({
     const saveNotebookName = async () => {
         if (editingNotebook && editingName.trim()) {
             setIsSavingNotebookName(true) // Start loading
-            await new Promise((resolve) => setTimeout(resolve, 500)) // Dummy delay
+            const request: UpdateNotebookRequest = {
+                name: editingName.trim() 
+            }
+            await axios.put<BaseResponse<UpdateNotebookResponse>>(
+                `${Config.apiBaseUrl}/${editingNotebook}`,
+                request
+            )
             onNotebookUpdate(editingNotebook, { name: editingName.trim() })
             setIsSavingNotebookName(false) // End loading
         }
