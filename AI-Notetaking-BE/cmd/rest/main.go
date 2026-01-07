@@ -21,8 +21,10 @@ func main() {
 	// Set timezone to WIB (Asia/Jakarta - UTC+7)
 	loc, err := time.LoadLocation("Asia/Jakarta")
 	if err != nil {
+		log.Fatalf("Failed to load location: %v", err)
 	} else {
 		time.Local = loc
+		log.Printf("Timezone set to WIB (Asia/Jakarta): %v", time.Now())
 	}
 
 	app := fiber.New(fiber.Config{
