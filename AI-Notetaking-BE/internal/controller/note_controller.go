@@ -17,6 +17,7 @@ type INoteController interface {
 	Create(ctx *fiber.Ctx) error
 	Show(ctx *fiber.Ctx) error
 	Update(ctx *fiber.Ctx) error
+	Delete(ctx *fiber.Ctx) error
 }
 
 type noteController struct {
@@ -34,6 +35,7 @@ func (c *noteController) RegisterRoutes(r fiber.Router) {
 	h.Post("", c.Create)
 	h.Get("/:id", c.Show)
 	h.Put("/:id", c.Update)
+	h.Delete("/:id", c.Delete)
 }
 
 func (c *noteController) Create(ctx *fiber.Ctx) error {
@@ -87,4 +89,16 @@ func (c *noteController) Update(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(serverutils.SuccessResponse("Success update note", res))
+}
+
+func (c *noteController) Delete(ctx *fiber.Ctx) error {
+	idParam := ctx.Params("id")
+	id, _ := uuid.Parse(idParam)
+
+	err := c.noteService.Delete(ctx.Context(), id)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(serverutils.SuccessResponse[any]("Success delete note", nil))
 }

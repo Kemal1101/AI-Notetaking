@@ -14,6 +14,7 @@ type INoteService interface {
 	Create(ctx context.Context, req *dto.CreateNoteRequest) (*dto.CreateNoteResponse, error)
 	Show(ctx context.Context, id uuid.UUID) (*dto.ShowNoteResponse, error)
 	Update(ctx context.Context, req *dto.UpdateNoteRequest) (*dto.UpdateNoteResponse, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type noteService struct {
@@ -81,4 +82,18 @@ func (c *noteService) Update(ctx context.Context, req *dto.UpdateNoteRequest) (*
 	return &dto.UpdateNoteResponse{
 		Id: note.Id,
 	}, nil
-}	
+}
+
+func (c *noteService) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := c.noteRepository.GetById(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	err = c.noteRepository.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
