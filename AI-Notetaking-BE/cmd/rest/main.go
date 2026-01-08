@@ -42,7 +42,7 @@ func main() {
 	noteRepository := repository.NewNoteRepository(db)
 
 	exampleService := service.NewExampleService(exampleRepository)
-	notebookService := service.NewNotebookService(notebookRepository, db)
+	notebookService := service.NewNotebookService(notebookRepository, noteRepository, db)
 	noteService := service.NewNoteService(noteRepository)
 
 	exampleController := controller.NewExampleController(exampleService)
