@@ -41,6 +41,7 @@ func (c *notebookService) GetAll(ctx context.Context) ([]*dto.GetAllNotebooksRes
 		return nil, err
 	}
 
+	ids := make([]uuid.UUID, 0)
 	result := make([]*dto.GetAllNotebooksResponse, 0)
 	for _, notebook := range notebooks {
 		res := dto.GetAllNotebooksResponse{
@@ -49,10 +50,30 @@ func (c *notebookService) GetAll(ctx context.Context) ([]*dto.GetAllNotebooksRes
 			ParentId:  notebook.ParentId,
 			CreatedAt: notebook.CreatedAt,
 			UpdatedAt: notebook.UpdatedAt,
+			Notes:     make([]*dto.GetAllNotebookNotesResponse, 0),
 		}
 		result = append(result, &res)
+		ids = append(ids, notebook.Id)
 	}
 
+	notes, err := c.noteRepository.GetByNotebookIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(result); i++ {
+		for j := range notes {
+			if result[i].Id == notes[j].NotebookId {
+				result[i].Notes = append(result[i].Notes, &dto.GetAllNotebookNotesResponse{
+					Id:        notes[j].Id,
+					Title:     notes[j].Title,
+					Content:   notes[j].Content,
+					CreatedAt: notes[j].CreatedAt,
+					UpdatedAt: notes[j].UpdatedAt,
+				})
+			}
+		}
+	}
 	return result, nil
 }
 

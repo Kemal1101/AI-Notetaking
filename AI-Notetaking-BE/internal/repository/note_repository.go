@@ -17,6 +17,7 @@ type INoteRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) INoteRepository
 	Create(ctx context.Context, note *entity.Note) error
 	GetById(ctx context.Context, id uuid.UUID) (*entity.Note, error)
+	GetByNotebookIds(ctx context.Context, notebookIds []uuid.UUID) ([]*entity.Note, error)
 	Update(ctx context.Context, note *entity.Note) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID) error
@@ -82,6 +83,45 @@ func (n *noteRepository) GetById(ctx context.Context, id uuid.UUID) (*entity.Not
 	}
 
 	return &note, nil
+}
+
+func (n *noteRepository) GetByNotebookIds(ctx context.Context, notebookIds []uuid.UUID) ([]*entity.Note, error) {
+	if len(notebookIds) == 0 {
+		return []*entity.Note{}, nil
+	}
+
+	rows, err := n.db.Query(
+		ctx,
+		`SELECT id, title, content, notebook_id, created_at, updated_at FROM note WHERE notebook_id = ANY($1) AND is_deleted = false`,
+		notebookIds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make([]*entity.Note, 0)
+	for rows.Next() {
+		var note entity.Note
+		err := rows.Scan(
+			&note.Id,
+			&note.Title,
+			&note.Content,
+			&note.NotebookId,
+			&note.CreatedAt,
+			&note.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		notes = append(notes, &note)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return notes, nil
 }
 
 func (n *noteRepository) Update(ctx context.Context, note *entity.Note) error {
