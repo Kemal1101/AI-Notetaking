@@ -42,6 +42,24 @@ export default function App() {
       createdAt: notebook.created_at,
       updatedAt: notebook.updated_at ?? notebook.created_at,
     })))
+
+    const notes = data.data.data.reduce<Note[]>(
+      (currentNotes, notebook) => {
+        return [
+          ...currentNotes,
+          ...notebook.notes.map(note => ({
+            id: note.id,
+            title: note.title,
+            content: note.content,
+            notebookId: notebook.id,
+            createdAt: note.created_at,
+            updatedAt: note.updated_at ?? note.created_at,
+          }))
+        ]
+      },
+      []
+    )
+    setNotes(notes)
   }
   useEffect(() => {
     fetchAllNotebooks()
