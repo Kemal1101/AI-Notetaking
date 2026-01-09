@@ -15,7 +15,7 @@ import axios from "axios"
 import { type CreateNotebookResponse, type CreateNotebookRequest, type GetAllNotebooksResponse, type MoveNotebookRequest } from "./dto/notebook"
 import type { BaseResponse } from "./dto/base-response"
 import { Config } from "./config/config"
-import type { CreateNoteRequest, CreateNoteResponse, UpdateNoteRequest, UpdateNoteResponse } from "./dto/note"
+import type { CreateNoteRequest, CreateNoteResponse, MoveNoteRequest, MoveNoteResponse, UpdateNoteRequest, UpdateNoteResponse } from "./dto/note"
 
 export default function App() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
@@ -136,7 +136,12 @@ export default function App() {
         note.id === noteId ? { ...note, notebookId: targetNotebookId, updatedAt: new Date() } : note,
       ),
     )
+    const request: MoveNoteRequest = {
+      notebook_id: targetNotebookId,
+    }
+    await axios.put<BaseResponse<MoveNoteResponse>>(`${Config.apiBaseUrl}/note/v1/move/${noteId}`, request)
 
+    await fetchAllNotebooks()
     // Auto-expand target notebook
     setExpandedNotebooks((prev) => new Set([...prev, targetNotebookId]))
     setIsProcessingMove(false) // End global loading

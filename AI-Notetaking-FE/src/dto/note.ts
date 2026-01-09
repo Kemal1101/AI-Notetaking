@@ -15,3 +15,11 @@ export interface UpdateNoteRequest{
 export interface UpdateNoteResponse{
     id : string;
 }
+
+export interface MoveNoteRequest{
+    notebook_id : string;
+}
+
+export interface MoveNoteResponse{
+    id : string;
+}
