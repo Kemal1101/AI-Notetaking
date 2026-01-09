@@ -15,6 +15,7 @@ import axios from "axios"
 import { type CreateNotebookResponse, type CreateNotebookRequest, type GetAllNotebooksResponse, type MoveNotebookRequest } from "./dto/notebook"
 import type { BaseResponse } from "./dto/base-response"
 import { Config } from "./config/config"
+import type { CreateNoteRequest, CreateNoteResponse } from "./dto/note"
 
 export default function App() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
@@ -33,7 +34,7 @@ export default function App() {
   const currentNote = notes.find((note) => note.id === selectedNote)
 
   const fetchAllNotebooks = async () => {
-    const data = await axios.get<BaseResponse<GetAllNotebooksResponse[]>>(`${Config.apiBaseUrl}`)
+    const data = await axios.get<BaseResponse<GetAllNotebooksResponse[]>>(`${Config.apiBaseUrl}/notebook/v1`)
 
     setNotebooks(data.data.data.map(notebook => ({
       id: notebook.id,
@@ -79,7 +80,7 @@ export default function App() {
 
     setIsDeletingNotebook(notebookId) // Set loading for this specific notebook
 
-    await axios.delete(`${Config.apiBaseUrl}/${notebookId}`)
+    await axios.delete(`${Config.apiBaseUrl}/notebook/v1/${notebookId}`)
 
     await fetchAllNotebooks()
 
@@ -149,7 +150,7 @@ export default function App() {
       parent_id: targetParentId
     }
     await axios.put<BaseResponse<MoveNotebookRequest>>(
-      `${Config.apiBaseUrl}/${notebookId}/move`,
+      `${Config.apiBaseUrl}/notebook/v1/${notebookId}/move`,
       request
     )
     await fetchAllNotebooks()
@@ -165,20 +166,17 @@ export default function App() {
 
     setIsCreatingNote(true)
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    const newNote: Note = {
-      id: `note-${Date.now()}`,
+    const request: CreateNoteRequest = {
       title: "Untitled Note",
       content: "# Untitled Note\n\nStart writing...",
-      notebookId: selectedNotebook,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      notebook_id: selectedNotebook,
     }
+    
 
-    setNotes((prev) => [...prev, newNote])
-    setSelectedNote(newNote.id)
+    const res =await axios.post<BaseResponse<CreateNoteResponse>>(`${Config.apiBaseUrl}/note/v1`, request)
+
+    await fetchAllNotebooks()
+    setSelectedNote(res.data.data.id)
 
     // Auto-expand the notebook when adding a note
     setExpandedNotebooks((prev) => new Set([...prev, selectedNotebook]))
@@ -195,7 +193,7 @@ export default function App() {
       name: "New Notebook",
       parent_id: selectedNotebook ?? null,
     }
-    await axios.post<BaseResponse<CreateNotebookResponse>>(`${Config.apiBaseUrl}`, request)
+    await axios.post<BaseResponse<CreateNotebookResponse>>(`${Config.apiBaseUrl}/notebook/v1`, request)
 
     await fetchAllNotebooks()
 

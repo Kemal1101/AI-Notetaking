@@ -3,6 +3,6 @@ export interface Note {
     title: string
     content: string
     notebookId: string
-    createdAt: Date
-    updatedAt: Date
+    createdAt: string | Date
+    updatedAt: string | Date
 }

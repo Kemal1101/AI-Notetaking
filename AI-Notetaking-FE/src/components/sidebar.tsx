@@ -88,7 +88,7 @@ export function Sidebar({
                 name: editingName.trim() 
             }
             await axios.put<BaseResponse<UpdateNotebookResponse>>(
-                `${Config.apiBaseUrl}/${editingNotebook}`,
+                `${Config.apiBaseUrl}/notebook/v1/${editingNotebook}`,
                 request
             )
             onNotebookUpdate(editingNotebook, { name: editingName.trim() })
