@@ -15,7 +15,7 @@ import axios from "axios"
 import { type CreateNotebookResponse, type CreateNotebookRequest, type GetAllNotebooksResponse, type MoveNotebookRequest } from "./dto/notebook"
 import type { BaseResponse } from "./dto/base-response"
 import { Config } from "./config/config"
-import type { CreateNoteRequest, CreateNoteResponse } from "./dto/note"
+import type { CreateNoteRequest, CreateNoteResponse, UpdateNoteRequest, UpdateNoteResponse } from "./dto/note"
 
 export default function App() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
@@ -67,8 +67,14 @@ export default function App() {
   }, [])
   
 
-  const handleNoteUpdate = (noteId: string, updates: Partial<Note>) => {
-    setNotes((prev) => prev.map((note) => (note.id === noteId ? { ...note, ...updates, updatedAt: new Date() } : note)))
+  const handleNoteUpdate = async(noteId: string, updates: Partial<Note>) => {
+    const request: UpdateNoteRequest = {
+      title: updates.title || "",
+      content: updates.content || ""
+    }
+    await axios.put<BaseResponse<UpdateNoteResponse>>(`${Config.apiBaseUrl}/note/v1/${noteId}`, request)
+
+    await fetchAllNotebooks()
   }
 
   const handleNotebookUpdate = () => {
