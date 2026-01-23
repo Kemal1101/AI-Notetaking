@@ -6,6 +6,8 @@ import (
 	"ai-notetaking-be/internal/repository"
 	"ai-notetaking-be/internal/service"
 	"ai-notetaking-be/pkg/database"
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -52,6 +54,7 @@ func main() {
 		"embed-note-content",
 		pubSub,
 	)
+	consumerService := service.NewConsumerService(pubSub, "embed-note-content")
 
 	exampleService := service.NewExampleService(exampleRepository)
 	notebookService := service.NewNotebookService(notebookRepository, noteRepository, db)
@@ -66,5 +69,11 @@ func main() {
 	notebookController.RegisterRoutes(api)
 	noteController.RegisterRoutes(api)
 
+	err = consumerService.Consume(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("server is running")
 	log.Fatal(app.Listen(":3000"))
 }
