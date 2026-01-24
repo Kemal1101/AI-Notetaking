@@ -58,6 +58,7 @@ func main() {
 	consumerService := service.NewConsumerService(
 		pubSub, 
 		os.Getenv("EMBED_NOTE_CONTENT_TOPIC_NAME"),
+		notebookRepository,
 		noteRepository,
 		noteEmbeddingRepository,
 	)

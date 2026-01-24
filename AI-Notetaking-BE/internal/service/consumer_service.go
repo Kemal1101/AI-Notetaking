@@ -7,6 +7,7 @@ import (
 	"ai-notetaking-be/pkg/embedding"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/google/uuid"
-	
 )
 
 type IConsumerService interface {
@@ -22,6 +22,7 @@ type IConsumerService interface {
 }
 
 type ConsumerService struct {
+	notebookRepository repository.INotebookRepository
 	noteRepository repository.INoteRepository
 	noteEmbeddingRepository repository.INoteEmbeddingRepository
 	pubSub    *gochannel.GoChannel
@@ -60,10 +61,33 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 	if err != nil {
 		panic(err)
 	}
+	notebook, err := cs.notebookRepository.GetById(ctx, note.NotebookId)
+	if err != nil {
+		panic(err)
+	}
+
+	noteUpdatedAt := "-"
+	if note.UpdatedAt != nil {
+		noteUpdatedAt = note.UpdatedAt.Format(time.RFC3339)
+	}
+	content := fmt.Sprintf(`
+	Note Title: %s
+	Notebook Title: %s
+	%s
+
+	Created At: %s
+	Updated At: %s
+	`,
+	note.Title,
+	notebook.Name,
+	note.Content,
+	note.CreatedAt.Format(time.RFC3339),
+	noteUpdatedAt,
+	)
 
 	embeddingRes, err := embedding.GetGeminiEmbedding(
 		os.Getenv("GOOGLE_GEMINI_API_KEY"),
-		note.Content,
+		content,
 	)
 	if err != nil {
 		panic(err)
@@ -71,7 +95,7 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 
 	noteEmbedding := &entity.NoteEmbedding{
 		Id:             uuid.New(),
-		Document:       note.Content,
+		Document:       content,
 		EmbeddingValue: embeddingRes.Embedding.Values,
 		NoteId:         note.Id,
 		CreatedAt:      time.Now(),
@@ -85,8 +109,9 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 
 	msg.Ack()
 }
-func NewConsumerService(pubSub *gochannel.GoChannel, topicName string, noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository) IConsumerService {
+func NewConsumerService(pubSub *gochannel.GoChannel, topicName string, notebookRepository repository.INotebookRepository, noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository) IConsumerService {
 	return &ConsumerService{
+		notebookRepository: notebookRepository,
 		noteRepository: noteRepository,
 		noteEmbeddingRepository: noteEmbeddingRepository,
 		pubSub:    pubSub,
