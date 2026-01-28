@@ -4,8 +4,10 @@ import (
 	"ai-notetaking-be/internal/dto"
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
+	"ai-notetaking-be/pkg/embedding"
 	"context"
 	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,17 +19,20 @@ type INoteService interface {
 	Update(ctx context.Context, req *dto.UpdateNoteRequest) (*dto.UpdateNoteResponse, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	MoveNote(ctx context.Context, req *dto.MoveNoteRequest) (*dto.MoveNoteResponse, error)
+	SemanticSearch(ctx context.Context, query string) ([]*dto.SemanticSearchResponse, error)
 }
 
 type noteService struct {
-	noteRepository repository.INoteRepository
-	publisherService IPublisherService
+	noteRepository          repository.INoteRepository
+	noteEmbeddingRepository repository.INoteEmbeddingRepository
+	publisherService        IPublisherService
 }
 
-func NewNoteService(noteRepository repository.INoteRepository, publisherService IPublisherService) INoteService {
+func NewNoteService(noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository, publisherService IPublisherService) INoteService {
 	return &noteService{
-		noteRepository: noteRepository,
-		publisherService: publisherService,
+		noteRepository:          noteRepository,
+		noteEmbeddingRepository: noteEmbeddingRepository,
+		publisherService:        publisherService,
 	}
 }
 
@@ -108,7 +113,7 @@ func (c *noteService) Update(ctx context.Context, req *dto.UpdateNoteRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &dto.UpdateNoteResponse{
 		Id: note.Id,
 	}, nil
@@ -144,7 +149,62 @@ func (c *noteService) MoveNote(ctx context.Context, req *dto.MoveNoteRequest) (*
 	}
 
 	return &dto.MoveNoteResponse{
-		Id: note.Id,
+		Id:         note.Id,
 		NotebookId: note.NotebookId,
 	}, nil
+}
+
+func (c *noteService) SemanticSearch(ctx context.Context, search string) ([]*dto.SemanticSearchResponse, error) {
+    embeddingResponse, err := embedding.GetGeminiEmbedding(
+        os.Getenv("GOOGLE_GEMINI_API_KEY"),
+        search,
+        "RETRIEVAL_QUERY",
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    noteEmbeddings, err := c.noteEmbeddingRepository.SemanticSearch(ctx, embeddingResponse.Embedding.Values)
+    if err != nil {
+        return nil, err
+    }
+
+
+    if len(noteEmbeddings) == 0 {
+        return []*dto.SemanticSearchResponse{}, nil
+    }
+
+    ids := make([]uuid.UUID, 0)
+    for _, noteEmbedding := range noteEmbeddings {
+        ids = append(ids, noteEmbedding.NoteId)
+    }
+
+    notes, err := c.noteRepository.GetByIds(ctx, ids)
+    if err != nil {
+        // This is a likely place for an error that gets converted to 404
+        return nil, err
+    }
+
+
+    notesMap := make(map[uuid.UUID]*entity.Note)
+    for _, n := range notes {
+        notesMap[n.Id] = n
+    }
+
+    res := make([]*dto.SemanticSearchResponse, 0)
+    for _, noteEmbedding := range noteEmbeddings {
+        if n, ok := notesMap[noteEmbedding.NoteId]; ok {
+            noteRes := &dto.SemanticSearchResponse{
+                Id:         n.Id,
+                Title:      n.Title,
+                Content:    n.Content,
+                NotebookId: n.NotebookId,
+                CreatedAt:  n.CreatedAt,
+                UpdatedAt:  n.UpdatedAt,
+            }
+            res = append(res, noteRes)
+        }
+    }
+
+    return res, nil
 }

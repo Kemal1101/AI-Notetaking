@@ -21,6 +21,7 @@ type INoteRepository interface {
 	Update(ctx context.Context, note *entity.Note) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID) error
+	GetByIds(ctx context.Context, ids []uuid.UUID) ([]*entity.Note, error)
 }
 
 type noteRepository struct {
@@ -167,4 +168,43 @@ func (n *noteRepository) DeleteByNotebookId(ctx context.Context, notebookId uuid
 	}
 
 	return nil
+}
+
+func (n *noteRepository) GetByIds(ctx context.Context, ids []uuid.UUID) ([]*entity.Note, error) {
+	if len(ids) == 0 {
+		return []*entity.Note{}, nil
+	}
+
+	rows, err := n.db.Query(
+		ctx,
+		`SELECT id, title, content, notebook_id, created_at, updated_at FROM note WHERE id = ANY($1) AND is_deleted = false`,
+		ids,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make([]*entity.Note, 0)
+	for rows.Next() {
+		var note entity.Note
+		err := rows.Scan(
+			&note.Id,
+			&note.Title,
+			&note.Content,
+			&note.NotebookId,
+			&note.CreatedAt,
+			&note.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		notes = append(notes, &note)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return notes, nil
 }

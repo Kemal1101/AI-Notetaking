@@ -23,11 +23,11 @@ type IConsumerService interface {
 }
 
 type ConsumerService struct {
-	notebookRepository repository.INotebookRepository
-	noteRepository repository.INoteRepository
+	notebookRepository      repository.INotebookRepository
+	noteRepository          repository.INoteRepository
 	noteEmbeddingRepository repository.INoteEmbeddingRepository
-	pubSub    *gochannel.GoChannel
-	topicName string
+	pubSub                  *gochannel.GoChannel
+	topicName               string
 
 	db *pgxpool.Pool
 }
@@ -81,16 +81,17 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 	Created At: %s
 	Updated At: %s
 	`,
-	note.Title,
-	notebook.Name,
-	note.Content,
-	note.CreatedAt.Format(time.RFC3339),
-	noteUpdatedAt,
+		note.Title,
+		notebook.Name,
+		note.Content,
+		note.CreatedAt.Format(time.RFC3339),
+		noteUpdatedAt,
 	)
 
 	embeddingRes, err := embedding.GetGeminiEmbedding(
 		os.Getenv("GOOGLE_GEMINI_API_KEY"),
 		content,
+		"RETRIEVAL_DOCUMENT",
 	)
 	if err != nil {
 		panic(err)
@@ -110,7 +111,7 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 		panic(err)
 	}
 	defer tx.Rollback(ctx)
-	
+
 	noteEmbeddingRepository := cs.noteEmbeddingRepository.UsingTx(ctx, tx)
 	err = noteEmbeddingRepository.DeleteByNoteId(ctx, note.Id)
 	if err != nil {
@@ -128,19 +129,19 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 	msg.Ack()
 }
 func NewConsumerService(
-	pubSub *gochannel.GoChannel, 
-	topicName string, 
-	notebookRepository repository.INotebookRepository, 
-	noteRepository repository.INoteRepository, 
+	pubSub *gochannel.GoChannel,
+	topicName string,
+	notebookRepository repository.INotebookRepository,
+	noteRepository repository.INoteRepository,
 	noteEmbeddingRepository repository.INoteEmbeddingRepository,
 	db *pgxpool.Pool,
 ) IConsumerService {
 	return &ConsumerService{
-		notebookRepository: notebookRepository,
-		noteRepository: noteRepository,
+		notebookRepository:      notebookRepository,
+		noteRepository:          noteRepository,
 		noteEmbeddingRepository: noteEmbeddingRepository,
-		pubSub:    pubSub,
-		topicName: topicName,
-		db : db,
+		pubSub:                  pubSub,
+		topicName:               topicName,
+		db:                      db,
 	}
 }
