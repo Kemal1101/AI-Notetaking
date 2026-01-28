@@ -35,7 +35,7 @@ func GetGeminiEmbedding(
 	text string,
 ) (*EmbeddingResponse, error) {
 	geminiReq := EmbeddingRequest{
-		Model: "gemini-embedding-exp-03-07",
+		Model: "gemini-embedding-001",
 		Content: EmbeddingRequestContent{
 			Parts: []EmbeddingRequestContentPart{
 				{
@@ -51,7 +51,7 @@ func GetGeminiEmbedding(
 	}
 	req, err := http.NewRequest(
 		"POST",
-		"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-exp-03-07:embedContent",
+		"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
 		bytes.NewBuffer(geminiReqJson),
 	)
 	if err != nil {

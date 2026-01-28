@@ -15,6 +15,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type IConsumerService interface {
@@ -27,6 +28,8 @@ type ConsumerService struct {
 	noteEmbeddingRepository repository.INoteEmbeddingRepository
 	pubSub    *gochannel.GoChannel
 	topicName string
+
+	db *pgxpool.Pool
 }
 
 func (cs *ConsumerService) Consume(ctx context.Context) error {
@@ -102,19 +105,42 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 		IsDeleted:      false,
 	}
 
-	err = cs.noteEmbeddingRepository.Create(ctx, noteEmbedding)
+	tx, err := cs.db.Begin(ctx)
+	if err != nil {
+		panic(err)
+	}
+	defer tx.Rollback(ctx)
+	
+	noteEmbeddingRepository := cs.noteEmbeddingRepository.UsingTx(ctx, tx)
+	err = noteEmbeddingRepository.DeleteByNoteId(ctx, note.Id)
+	if err != nil {
+		panic(err)
+	}
+	err = noteEmbeddingRepository.Create(ctx, noteEmbedding)
 	if err != nil {
 		panic(err)
 	}
 
+	err = tx.Commit(ctx)
+	if err != nil {
+		panic(err)
+	}
 	msg.Ack()
 }
-func NewConsumerService(pubSub *gochannel.GoChannel, topicName string, notebookRepository repository.INotebookRepository, noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository) IConsumerService {
+func NewConsumerService(
+	pubSub *gochannel.GoChannel, 
+	topicName string, 
+	notebookRepository repository.INotebookRepository, 
+	noteRepository repository.INoteRepository, 
+	noteEmbeddingRepository repository.INoteEmbeddingRepository,
+	db *pgxpool.Pool,
+) IConsumerService {
 	return &ConsumerService{
 		notebookRepository: notebookRepository,
 		noteRepository: noteRepository,
 		noteEmbeddingRepository: noteEmbeddingRepository,
 		pubSub:    pubSub,
 		topicName: topicName,
+		db : db,
 	}
 }

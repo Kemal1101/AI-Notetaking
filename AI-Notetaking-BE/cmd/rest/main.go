@@ -61,6 +61,7 @@ func main() {
 		notebookRepository,
 		noteRepository,
 		noteEmbeddingRepository,
+		db,
 	)
 
 	exampleService := service.NewExampleService(exampleRepository)
