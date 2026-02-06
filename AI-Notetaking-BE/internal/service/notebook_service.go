@@ -5,6 +5,7 @@ import (
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,16 +23,24 @@ type INotebookService interface {
 }
 
 type notebookService struct {
-	notebookRepository repository.INotebookRepository
-	noteRepository     repository.INoteRepository
-	db *pgxpool.Pool
+	notebookRepository      repository.INotebookRepository
+	noteRepository          repository.INoteRepository
+	noteEmbeddingRepository repository.INoteEmbeddingRepository
+	publisherService        IPublisherService
+	db                      *pgxpool.Pool
 }
 
-func NewNotebookService(notebookRepository repository.INotebookRepository, noteRepository repository.INoteRepository, db *pgxpool.Pool) INotebookService {
+func NewNotebookService(notebookRepository repository.INotebookRepository,
+	noteRepository repository.INoteRepository,
+	noteEmbeddingRepository repository.INoteEmbeddingRepository,
+	publisherService IPublisherService,
+	db *pgxpool.Pool) INotebookService {
 	return &notebookService{
-		notebookRepository: notebookRepository,
-		noteRepository:     noteRepository,
-		db: db,
+		notebookRepository:      notebookRepository,
+		noteRepository:          noteRepository,
+		noteEmbeddingRepository: noteEmbeddingRepository,
+		publisherService:        publisherService,
+		db:                      db,
 	}
 }
 
@@ -79,9 +88,9 @@ func (c *notebookService) GetAll(ctx context.Context) ([]*dto.GetAllNotebooksRes
 
 func (c *notebookService) Create(ctx context.Context, req *dto.CreateNotebookRequest) (*dto.CreateNotebookResponse, error) {
 	notebook := entity.Notebook{
-		Id:       uuid.New(),
-		Name:     req.Name,
-		ParentId: req.ParentId,
+		Id:        uuid.New(),
+		Name:      req.Name,
+		ParentId:  req.ParentId,
 		CreatedAt: time.Now(),
 	}
 	err := c.notebookRepository.Create(ctx, &notebook)
@@ -99,7 +108,7 @@ func (c *notebookService) Show(ctx context.Context, id uuid.UUID) (*dto.ShowNote
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &dto.ShowNotebookResponse{
 		Id:        notebook.Id,
 		Name:      notebook.Name,
@@ -114,7 +123,7 @@ func (c *notebookService) Update(ctx context.Context, req *dto.UpdateNotebookReq
 	if err != nil {
 		return nil, err
 	}
-	
+
 	now := time.Now()
 	notebook.Name = req.Name
 	notebook.UpdatedAt = &now
@@ -123,7 +132,26 @@ func (c *notebookService) Update(ctx context.Context, req *dto.UpdateNotebookReq
 	if err != nil {
 		return nil, err
 	}
-	
+
+	notes, err := c.noteRepository.GetByNotebookIds(ctx, []uuid.UUID{notebook.Id})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, note := range notes {
+		msg := dto.PublishEmbedNoteMessage{
+			NoteId: note.Id,
+		}
+		msgJson, err := json.Marshal(msg)
+		if err != nil {
+			return nil, err
+		}
+		err = c.publisherService.Publish(ctx, msgJson)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	res := dto.UpdateNotebookResponse{
 		Id: notebook.Id,
 	}
@@ -135,7 +163,7 @@ func (c *notebookService) Delete(ctx context.Context, id uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	
+
 	tx, err := c.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -144,6 +172,7 @@ func (c *notebookService) Delete(ctx context.Context, id uuid.UUID) error {
 
 	txRepo := c.notebookRepository.UsingTx(ctx, tx)
 	noteRepo := c.noteRepository.UsingTx(ctx, tx)
+	noteEmbedRepo := c.noteEmbeddingRepository.UsingTx(ctx, tx)
 
 	err = txRepo.DeleteById(ctx, id)
 	if err != nil {
@@ -155,6 +184,11 @@ func (c *notebookService) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
+	err = noteEmbedRepo.DeleteByNotebookId(ctx, id)
+	if err != nil {
+		return err
+	}
+	
 	err = noteRepo.DeleteByNotebookId(ctx, id)
 	if err != nil {
 		return err
@@ -179,12 +213,12 @@ func (c *notebookService) MoveNotebook(ctx context.Context, req *dto.MoveNoteboo
 			return nil, err
 		}
 	}
-	
+
 	err = c.notebookRepository.UpdateParentId(ctx, req.Id, req.ParentId)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &dto.MoveNotebookResponse{
 		Id: req.Id,
 	}, nil
