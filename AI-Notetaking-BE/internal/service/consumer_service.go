@@ -62,10 +62,12 @@ func (cs *ConsumerService) processMessage(ctx context.Context, msg *message.Mess
 
 	note, err := cs.noteRepository.GetById(ctx, payload.NoteId)
 	if err != nil {
+		log.Errorf("Failed get note id %s: %v", payload.NoteId, err)
 		panic(err)
 	}
 	notebook, err := cs.notebookRepository.GetById(ctx, note.NotebookId)
 	if err != nil {
+		log.Errorf("Failed get notebook id %s: %v", note.NotebookId, err)
 		panic(err)
 	}
 
