@@ -23,3 +23,12 @@ export interface MoveNoteRequest{
 export interface MoveNoteResponse{
     id : string;
 }
+
+export interface GetSemanticSearchResponse{
+    id : string;
+    title : string;
+    content : string;
+    notebook_id : string;
+    created_at : Date;
+    updated_at : Date | null;
+}
