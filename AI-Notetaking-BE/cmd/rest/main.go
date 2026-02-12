@@ -45,6 +45,9 @@ func main() {
 	notebookRepository := repository.NewNotebookRepository(db)
 	noteRepository := repository.NewNoteRepository(db)
 	noteEmbeddingRepository := repository.NewNoteEmbeddingRepository(db)
+	chatSessionRepository := repository.NewChatSessionRepository(db)
+	chatMessageRepository := repository.NewChatMessageRepository(db)
+	chatMessageRawRepository := repository.NewChatMessageRawRepository(db)
 
 	watermillLogger := watermill.NewStdLogger(false, false)
 	pubSub := gochannel.NewGoChannel(
@@ -67,15 +70,18 @@ func main() {
 	exampleService := service.NewExampleService(exampleRepository)
 	notebookService := service.NewNotebookService(notebookRepository, noteRepository, noteEmbeddingRepository, publisherService, db)
 	noteService := service.NewNoteService(noteRepository, noteEmbeddingRepository, publisherService, db)
+	chatbotService := service.NewChatbotService(db, chatSessionRepository, chatMessageRepository, chatMessageRawRepository)
 
 	exampleController := controller.NewExampleController(exampleService)
 	notebookController := controller.NewNotebookController(notebookService)
 	noteController := controller.NewNoteController(noteService)
+	chatbotController := controller.NewChatbotController(chatbotService)
 
 	api := app.Group("/api")
 	exampleController.RegisterRoutes(api)
 	notebookController.RegisterRoutes(api)
 	noteController.RegisterRoutes(api)
+	chatbotController.RegisterRoutes(api)
 
 	err = consumerService.Consume(context.Background())
 	if err != nil {
