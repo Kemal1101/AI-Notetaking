@@ -16,3 +16,10 @@ type GetAllSessionResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt *time.Time `json:"updated_at"`
 }
+
+type GetChatHistoryResponse struct {
+	Id uuid.UUID `json:"id"`
+	Chat string `json:"chat"`
+	Role string `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+}

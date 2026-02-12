@@ -5,12 +5,15 @@ import (
 
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/pkg/database"
+
+	"github.com/google/uuid"
 )
 
 type IChatSessionRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IChatSessionRepository
 	Create(ctx context.Context, chatSession *entity.ChatSession) error
 	GetAll(ctx context.Context) ([]*entity.ChatSession, error)
+	GetById(ctx context.Context, chatSessionId uuid.UUID) (*entity.ChatSession, error)
 }
 
 type chatSessionRepository struct {
@@ -66,6 +69,28 @@ func (cs *chatSessionRepository) GetAll(ctx context.Context) ([]*entity.ChatSess
 		res = append(res, &chatSession)
 	}
 	return res, nil
+}
+
+func (cs *chatSessionRepository) GetById(ctx context.Context, chatSessionId uuid.UUID) (*entity.ChatSession, error) {
+	row := cs.db.QueryRow(
+		ctx,
+		`SELECT id, title, created_at, updated_at, deleted_at, is_deleted FROM chat_session WHERE id = $1 AND is_deleted = false`,
+		chatSessionId,
+	)
+
+	var result entity.ChatSession
+	err := row.Scan(
+		&result.Id,
+		&result.Title,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+		&result.DeletedAt,
+		&result.IsDeleted,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func NewChatSessionRepository(db database.DatabaseQueryer) IChatSessionRepository {
