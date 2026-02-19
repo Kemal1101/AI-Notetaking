@@ -6,6 +6,7 @@ import (
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
 	"ai-notetaking-be/pkg/chatbot"
+	"ai-notetaking-be/pkg/embedding"
 	"context"
 	"os"
 	"strings"
@@ -27,6 +28,7 @@ type chatbotService struct{
 	chatSessionRepository repository.IChatSessionRepository
 	chatMessageRepository repository.IChatMessageRepository
 	chatMessageRawRepository repository.IChatMessageRawRepository
+	noteEmbeddingRepository repository.INoteEmbeddingRepository
 }
 
 func (cs *chatbotService) CreateSession(ctx context.Context) (*dto.CreateSessionResponse, error) {
@@ -149,6 +151,7 @@ func (cs *chatbotService) SendChat(ctx context.Context, req *dto.SendChatRequest
 	chatSessionRepository := cs.chatSessionRepository.UsingTx(ctx, tx)
 	chatMessageRepository := cs.chatMessageRepository.UsingTx(ctx, tx)
 	chatMessageRawRepository := cs.chatMessageRawRepository.UsingTx(ctx, tx)
+	noteEmbeddingRepository := cs.noteEmbeddingRepository.UsingTx(ctx, tx)
 
 	chatSession , err := chatSessionRepository.GetById(ctx, req.ChatSessionId)
 	if err != nil {
@@ -170,7 +173,26 @@ func (cs *chatbotService) SendChat(ctx context.Context, req *dto.SendChatRequest
 		CreatedAt:     now,
 	}
 
+	embeddingResponse, err := embedding.GetGeminiEmbedding(
+        os.Getenv("GOOGLE_GEMINI_API_KEY"),
+        req.Chat,
+        "RETRIEVAL_QUERY",
+    )
+    if err != nil {
+        return nil, err
+    }
+	noteEmbeddings, err := noteEmbeddingRepository.SearchSimilarity(ctx, embeddingResponse.Embedding.Values)
+	if err != nil {
+		return nil, err
+	}
+
 	strBuilder := strings.Builder{}
+	for _, noteEmbedding := range noteEmbeddings {
+		strBuilder.WriteString("Reference relevant note: ")
+		strBuilder.WriteString(noteEmbedding.Document)
+		strBuilder.WriteString("\n\n")
+	}
+
 	strBuilder.WriteString("User next question: ")
 	strBuilder.WriteString(req.Chat)
 	strBuilder.WriteString("\n\n")
@@ -265,11 +287,13 @@ func NewChatbotService(
 	chatSessionRepository repository.IChatSessionRepository,
 	chatMessageRepository repository.IChatMessageRepository,
 	chatMessageRawRepository repository.IChatMessageRawRepository,
+	noteEmbeddingRepository repository.INoteEmbeddingRepository,
 ) IChatbotService {
 	return &chatbotService{
 		db: db,
 		chatSessionRepository: chatSessionRepository,
 		chatMessageRepository: chatMessageRepository,
 		chatMessageRawRepository: chatMessageRawRepository,
+		noteEmbeddingRepository: noteEmbeddingRepository,
 	}
 }
