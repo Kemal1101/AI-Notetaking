@@ -5,7 +5,10 @@ import (
 	"ai-notetaking-be/internal/dto"
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
+	"ai-notetaking-be/pkg/chatbot"
 	"context"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -166,23 +169,43 @@ func (cs *chatbotService) SendChat(ctx context.Context, req *dto.SendChatRequest
 		ChatSessionId: req.ChatSessionId,
 		CreatedAt:     now,
 	}
+
+	strBuilder := strings.Builder{}
+	strBuilder.WriteString("User next question: ")
+	strBuilder.WriteString(req.Chat)
+	strBuilder.WriteString("\n\n")
+	strBuilder.WriteString("Your answer ?")
 	chatMessageRaw := entity.ChatMessageRaw{
 		Id:            uuid.New(),
-		Chat:          req.Chat,
+		Chat:          strBuilder.String(),
 		Role:          constant.ChatMessageRoleUser,
 		ChatSessionId: req.ChatSessionId,
 		CreatedAt:     now,
 	}
+
+	existingChatMessageRaw = append(existingChatMessageRaw, &chatMessageRaw)
+	geminiReq := make([]*chatbot.ChatHistory, 0)
+	for _, chat := range existingChatMessageRaw {
+		geminiReq = append(geminiReq, &chatbot.ChatHistory{
+			Chat: chat.Chat,
+			Role: chat.Role,
+		})
+	}
+
+	reply, err := chatbot.GetGeminiResponse(ctx, os.Getenv("GOOGLE_GEMINI_API_KEY"), geminiReq)
+	if err != nil {
+		return nil, err
+	}
 	chatMessageModel := entity.ChatMessage{
 		Id:            uuid.New(),
-		Chat:          "This is a response from the model.",
+		Chat:          reply,
 		Role:          constant.ChatMessageRoleModel,
 		ChatSessionId: req.ChatSessionId,
 		CreatedAt:     now.Add(1 * time.Millisecond),
 	}
 	chatMessageModelRaw := entity.ChatMessageRaw{
 		Id:            uuid.New(),
-		Chat:          "This is a response from the model.",
+		Chat:          reply,
 		Role:          constant.ChatMessageRoleModel,
 		ChatSessionId: req.ChatSessionId,
 		CreatedAt:     now.Add(1 * time.Millisecond),
