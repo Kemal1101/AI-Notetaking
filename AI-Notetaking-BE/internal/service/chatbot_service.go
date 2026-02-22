@@ -172,26 +172,49 @@ func (cs *chatbotService) SendChat(ctx context.Context, req *dto.SendChatRequest
 		ChatSessionId: req.ChatSessionId,
 		CreatedAt:     now,
 	}
-
-	embeddingResponse, err := embedding.GetGeminiEmbedding(
-        os.Getenv("GOOGLE_GEMINI_API_KEY"),
-        req.Chat,
-        "RETRIEVAL_QUERY",
-    )
+	
+	decideUseRAGChatHistories := []*chatbot.ChatHistory{
+        {
+            // Prompt sistem yang memberi tahu model apa yang harus dilakukan.
+            Chat: "You are a helpful assistant. Based on the user's last question, decide if you need to search through external notes to provide a better answer. Your only output should be a JSON with a single key 'answer_directly' which is a boolean. If you need to search notes, 'answer_directly' should be false.",
+            Role: constant.ChatMessageRoleModel, // Atau 'user' jika model lebih responsif
+        },
+        {
+            Chat: req.Chat, // Hanya pertanyaan terakhir dari pengguna
+            Role: constant.ChatMessageRoleUser,
+        },
+    }
+	useRag, err := chatbot.DecideToUseRag(ctx, os.Getenv("GOOGLE_GEMINI_API_KEY"), decideUseRAGChatHistories)
     if err != nil {
         return nil, err
     }
-	noteEmbeddings, err := noteEmbeddingRepository.SearchSimilarity(ctx, embeddingResponse.Embedding.Values)
-	if err != nil {
-		return nil, err
-	}
 
-	strBuilder := strings.Builder{}
-	for _, noteEmbedding := range noteEmbeddings {
-		strBuilder.WriteString("Reference relevant note: ")
-		strBuilder.WriteString(noteEmbedding.Document)
-		strBuilder.WriteString("\n\n")
-	}
+    strBuilder := strings.Builder{}
+    if useRag {
+        // 2. Dapatkan embedding HANYA jika RAG diperlukan. Ini menghemat satu panggilan API jika tidak perlu.
+        embeddingResponse, err := embedding.GetGeminiEmbedding(
+            os.Getenv("GOOGLE_GEMINI_API_KEY"),
+            req.Chat,
+            "RETRIEVAL_QUERY",
+        )
+        if err != nil {
+            return nil, err
+        }
+
+        noteEmbeddings, err := noteEmbeddingRepository.SearchSimilarity(ctx, embeddingResponse.Embedding.Values)
+        if err != nil {
+            return nil, err
+        }
+
+        if len(noteEmbeddings) > 0 {
+            strBuilder.WriteString("--- Relevant Notes ---\n")
+            for _, noteEmbedding := range noteEmbeddings {
+                strBuilder.WriteString(noteEmbedding.Document)
+                strBuilder.WriteString("\n")
+            }
+            strBuilder.WriteString("----------------------\n\n")
+        }
+    }
 
 	strBuilder.WriteString("User next question: ")
 	strBuilder.WriteString(req.Chat)
