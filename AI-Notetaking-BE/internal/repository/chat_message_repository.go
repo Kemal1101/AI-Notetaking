@@ -2,15 +2,19 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/pkg/database"
+
+	"github.com/google/uuid"
 )
 
 type IChatMessageRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IChatMessageRepository
 	Create(ctx context.Context, chatMessage *entity.ChatMessage) error
 	GetBySessionId(ctx context.Context, chatSessionId string) ([]*entity.ChatMessage, error)
+	DeleteBySessionId(ctx context.Context, chatSessionId uuid.UUID) error
 }
 
 type chatMessageRepository struct {
@@ -70,6 +74,21 @@ func (cm *chatMessageRepository) GetBySessionId(ctx context.Context, chatSession
 		res = append(res, &chatMessage)
 	}
 	return res, nil
+}
+
+func (cm *chatMessageRepository) DeleteBySessionId(ctx context.Context, chatSessionId uuid.UUID) error {
+	_, err := cm.db.Exec(
+		ctx,
+		`UPDATE chat_message SET is_deleted = true, deleted_at = $1 WHERE chat_session_id = $2 AND is_deleted = false`,
+		time.Now(),
+		chatSessionId,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewChatMessageRepository(db database.DatabaseQueryer) IChatMessageRepository {
