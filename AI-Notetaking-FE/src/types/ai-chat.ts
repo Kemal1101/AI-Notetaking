@@ -9,6 +9,6 @@ export interface ChatSession {
     id: string
     name: string
     messages: Message[]
-    createdAt: Date
-    updatedAt: Date
+    created_at: Date
+    updated_at: Date
 }

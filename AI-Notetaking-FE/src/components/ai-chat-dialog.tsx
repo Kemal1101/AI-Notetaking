@@ -1,14 +1,18 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { Button } from "./ui/button"
 import { Textarea } from "./ui/textarea"
 import { ScrollArea } from "./ui/scroll-area"
 import { Send, Bot, User, Plus, Trash2 } from "lucide-react"
 import type { Note } from "../types/note"
-import type { ChatSession, Message } from "@/types/ai-chat"
+import type { ChatSession, Message } from "../types/ai-chat"
+import axios from "axios"
+import type { BaseResponse } from "../dto/base-response"
+import type { GetAllSessionsResponse } from "../dto/chatbot"
+import { Config } from "../config/config"
 
 interface AIChatDialogProps {
     open: boolean
@@ -18,23 +22,7 @@ interface AIChatDialogProps {
 
 export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
     const [input, setInput] = useState("")
-    const [sessions, setSessions] = useState<ChatSession[]>([
-        {
-            id: "session-1",
-            name: "New Chat",
-            messages: [
-                {
-                    id: "1",
-                    role: "assistant",
-                    content:
-                        "Hello! I can help you find information from your notes or answer questions based on your knowledge base. What would you like to know?",
-                    timestamp: new Date(),
-                },
-            ],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        },
-    ])
+    const [sessions, setSessions] = useState<ChatSession[]>([])
     const [activeSessionId, setActiveSessionId] = useState("session-1")
     const [isLoading, setIsLoading] = useState(false)
 
@@ -53,8 +41,8 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
                     timestamp: new Date(),
                 },
             ],
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            created_at: new Date(),
+            updated_at: new Date(),
         }
 
         setSessions((prev) => [...prev, newSession])
@@ -94,7 +82,7 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
                         updatedName = userMessage.content.substring(0, 30) + (userMessage.content.length > 30 ? "..." : "")
                     }
 
-                    return { ...s, name: updatedName, messages: updatedMessages, updatedAt: new Date() }
+                    return { ...s, name: updatedName, messages: updatedMessages, updated_at: new Date() }
                 }
                 return s
             }),
@@ -113,7 +101,7 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
 
             setSessions((prev) =>
                 prev.map((s) =>
-                    s.id === activeSessionId ? { ...s, messages: [...s.messages, aiResponse], updatedAt: new Date() } : s,
+                    s.id === activeSessionId ? { ...s, messages: [...s.messages, aiResponse], updated_at: new Date() } : s,
                 ),
             )
 
@@ -144,6 +132,24 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
             handleSend()
         }
     }
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const res = await axios.get<BaseResponse<GetAllSessionsResponse[]>>(
+                `${Config.apiBaseUrl}/chatbot/v1/sessions`
+            )
+            setSessions(res.data.data.map(session => ({
+                id: session.id,
+                name: session.title,
+                messages: [],
+                created_at: new Date(session.created_at),
+                updated_at: new Date(session.updated_at ?? session.created_at),
+            })))
+        }
+        if (open) {
+            fetchData()
+        }
+    }, [open])
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -181,7 +187,7 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
                                         >
                                             <span className="truncate w-full text-xs font-medium">{session.name}</span>
                                             <span className="text-[10px] text-gray-500 w-full mt-0.5">
-                                                {session.createdAt.toLocaleDateString()}
+                                                {session.created_at.toLocaleDateString()}
                                             </span>
                                         </Button>
                                         {sessions.length > 1 && (
