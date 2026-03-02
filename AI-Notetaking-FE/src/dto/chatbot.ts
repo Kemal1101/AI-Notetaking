@@ -11,3 +11,7 @@ export interface GetChatHistoryResponse {
     chat: string;
     created_at: Date;
 }
+
+export interface CreateSessionResponse{
+    id: string;
+} 
