@@ -15,3 +15,11 @@ export interface GetChatHistoryResponse {
 export interface CreateSessionResponse{
     id: string;
 } 
+
+export interface DeleteSessionRequest {
+    chat_session_id: string;
+}
+
+export interface DeleteSessionResponse {
+
+}

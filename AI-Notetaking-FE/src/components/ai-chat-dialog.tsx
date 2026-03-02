@@ -11,7 +11,7 @@ import type { Note } from "../types/note"
 import type { ChatSession, Message } from "../types/ai-chat"
 import axios from "axios"
 import type { BaseResponse } from "../dto/base-response"
-import type { CreateSessionResponse, GetAllSessionsResponse, GetChatHistoryResponse } from "../dto/chatbot"
+import type { CreateSessionResponse, DeleteSessionRequest, GetAllSessionsResponse, GetChatHistoryResponse } from "../dto/chatbot"
 import { Config } from "../config/config"
 
 interface AIChatDialogProps {
@@ -28,17 +28,19 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
 
     const activeSession = sessions.find((s) => s.id === activeSessionId)
     const messages = activeSession?.messages || []
-    const fetchData = async () => {
+    const fetchData = async (): Promise<ChatSession[]> => {
             const res = await axios.get<BaseResponse<GetAllSessionsResponse[]>>(
                 `${Config.apiBaseUrl}/chatbot/v1/sessions`
             )
-            setSessions(res.data.data.map(session => ({
+            const newSessions = res.data.data.map(session => ({
                 id: session.id,
                 name: session.title,
                 messages: [],
                 created_at: new Date(session.created_at),
                 updated_at: new Date(session.updated_at ?? session.created_at),
-            })))
+            }))
+            setSessions(newSessions)
+            return newSessions
     }
 
     const sessionClickHandler = async (sessionId: string) => {
@@ -74,14 +76,21 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
         sessionClickHandler(res.data.data.id)
     }
 
-    const deleteSession = (sessionId: string) => {
+    const deleteSession = async (sessionId: string) => {
         if (sessions.length <= 1) return
 
-        setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+        const data: DeleteSessionRequest = {
+            chat_session_id: sessionId,
+        }
+        await axios.delete(`${Config.apiBaseUrl}/chatbot/v1/delete-session`,{
+            data
+        })
+
+        await fetchData()
 
         if (activeSessionId === sessionId) {
             const remainingSessions = sessions.filter((s) => s.id !== sessionId)
-            setActiveSessionId(remainingSessions[0]?.id || "")
+            sessionClickHandler(remainingSessions[0]?.id ?? "")
         }
     }
 
@@ -159,8 +168,14 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
     }
 
     useEffect(() => {
+        const fetchList = async () => {
+            const newSessions = await fetchData()
+            if (newSessions.length > 0) {
+                sessionClickHandler(newSessions[0].id)
+            }
+        }
         if (open) {
-            fetchData()
+            fetchList()
         }
     }, [open])
 
@@ -198,7 +213,8 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
                                                 }`}
                                             onClick={() => sessionClickHandler(session.id)}
                                         >
-                                            <span className="truncate w-full text-xs font-medium">{session.name}</span>
+                                            <span className="truncate w-full text-xs font-medium">
+                                            {session.name.length > 18 ? `${session.name.slice(0, 18)}...` : session.name}</span>
                                             <span className="text-[10px] text-gray-500 w-full mt-0.5">
                                                 {session.created_at.toLocaleDateString()}
                                             </span>
