@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import ReactMarkdown from "react-markdown"
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { Button } from "./ui/button"
@@ -11,7 +12,7 @@ import type { Note } from "../types/note"
 import type { ChatSession, Message } from "../types/ai-chat"
 import axios from "axios"
 import type { BaseResponse } from "../dto/base-response"
-import type { CreateSessionResponse, DeleteSessionRequest, GetAllSessionsResponse, GetChatHistoryResponse } from "../dto/chatbot"
+import type { CreateSessionResponse, DeleteSessionRequest, GetAllSessionsResponse, GetChatHistoryResponse, SendChatRequest, SendChatResponse } from "../dto/chatbot"
 import { Config } from "../config/config"
 
 interface AIChatDialogProps {
@@ -20,7 +21,7 @@ interface AIChatDialogProps {
     notes: Note[]
 }
 
-export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
+export function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) {
     const [input, setInput] = useState("")
     const [sessions, setSessions] = useState<ChatSession[]>([])
     const [activeSessionId, setActiveSessionId] = useState("")
@@ -97,67 +98,66 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
     const handleSend = async () => {
         if (!input.trim() || isLoading || !activeSession) return
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: "user",
-            content: input,
-            timestamp: new Date(),
-        }
+        setInput("")
+        setIsLoading(true)
 
         setSessions((prev) =>
             prev.map((s) => {
                 if (s.id === activeSessionId) {
-                    const updatedMessages = [...s.messages, userMessage]
-                    let updatedName = s.name
-
-                    const hasOnlyInitialAssistantMessage = s.messages.length === 1 && s.messages[0].role === "assistant"
-
-                    if (hasOnlyInitialAssistantMessage) {
-                        updatedName = userMessage.content.substring(0, 30) + (userMessage.content.length > 30 ? "..." : "")
+                    return {
+                        ...s,
+                        messages: [
+                            ...s.messages,
+                            {
+                                id: 'test',
+                                content: input,
+                                role: "user",
+                                timestamp: new Date(),
+                            },
+                        ]
                     }
-
-                    return { ...s, name: updatedName, messages: updatedMessages, updated_at: new Date() }
                 }
-                return s
+                return { ...s }
             }),
         )
 
-        setInput("")
-        setIsLoading(true)
-
-        setTimeout(() => {
-            const aiResponse: Message = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: generateAIResponse(input, notes),
-                timestamp: new Date(),
-            }
-
-            setSessions((prev) =>
-                prev.map((s) =>
-                    s.id === activeSessionId ? { ...s, messages: [...s.messages, aiResponse], updated_at: new Date() } : s,
-                ),
-            )
-
-            setIsLoading(false)
-        }, 1000)
-    }
-
-    const generateAIResponse = (query: string, notes: Note[]): string => {
-        const relevantNotes = notes.filter(
-            (note) =>
-                note.content.toLowerCase().includes(query.toLowerCase()) ||
-                note.title.toLowerCase().includes(query.toLowerCase()),
+        const request: SendChatRequest = {
+            chat: input,
+            chat_session_id: activeSessionId,
+        }
+        const res = await axios.post<BaseResponse<SendChatResponse>>(
+            `${Config.apiBaseUrl}/chatbot/v1/send-chat`,
+            request
         )
 
-        if (relevantNotes.length > 0) {
-            return `Based on your notes, I found ${relevantNotes.length} relevant note(s). Here's what I can tell you:\n\n${relevantNotes
-                .slice(0, 2)
-                .map((note) => `**${note.title}**: ${note.content.substring(0, 200)}...`)
-                .join("\n\n")}\n\nWould you like me to elaborate on any specific aspect?`
-        }
+        setSessions((prev) =>
+            prev.map((s) => {
+                if (s.id === activeSessionId) {
+                    return {
+                        ...s,
+                        name: res.data.data.title,
+                        messages: [
+                            ...s.messages.slice(0, -1),
+                            {
+                                id: res.data.data.sent.id,
+                                content: res.data.data.sent.chat,
+                                role: res.data.data.sent.role === "model" ? "assistant" : "user",
+                                timestamp: new Date(res.data.data.sent.created_at),
+                            },
+                            {
+                                id: res.data.data.reply.id,
+                                content: res.data.data.reply.chat,
+                                role: res.data.data.reply.role === "model" ? "assistant" : "user",
+                                timestamp: new Date(res.data.data.reply.created_at),
+                            }
+                        ]
+                    }
+                }
+                return { ...s }
+            }),
+        )
 
-        return `I couldn't find specific information about "${query}" in your notes. However, I can help you with general questions or suggest creating a new note about this topic. What would you like to do?`
+        setIsLoading(false)
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -263,7 +263,13 @@ export function AIChatDialog({ open, onOpenChange, notes }: AIChatDialogProps) {
                                                     : "bg-gradient-to-r from-gray-50 to-gray-100 text-gray-900 border border-gray-200"
                                                     }`}
                                             >
-                                                <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                                                {message.role === "assistant" ? (
+                                                    <ReactMarkdown className="prose prose-sm max-w-none">
+                                                        {message.content}
+                                                    </ReactMarkdown>
+                                                ) : (
+                                                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                                                )}
                                                 <div className={`text-xs mt-1 ${message.role === "user" ? "opacity-70" : "opacity-60"}`}>
                                                     {message.timestamp.toLocaleTimeString()}
                                                 </div>
